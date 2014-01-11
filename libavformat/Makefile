@@ -162,6 +162,7 @@ OBJS-$(CONFIG_FFM_DEMUXER)               += ffmdec.o
 OBJS-$(CONFIG_FFM_MUXER)                 += ffmenc.o
 OBJS-$(CONFIG_FFMETADATA_DEMUXER)        += ffmetadec.o
 OBJS-$(CONFIG_FFMETADATA_MUXER)          += ffmetaenc.o
+OBJS-$(CONFIG_FFPROBE_DEFAULT_DEMUXER)   += ffprobedec.o
 OBJS-$(CONFIG_FFTEXTDATA_DEMUXER)        += fftextdatadec.o
 OBJS-$(CONFIG_FFTEXTDATA_MUXER)          += fftextdataenc.o
 OBJS-$(CONFIG_FIFO_MUXER)                += fifo.o
