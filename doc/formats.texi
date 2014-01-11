@@ -255,3 +255,4 @@ The exact semantics of stream specifiers is defined by the
 @include muxers.texi
 @end ifclear
 @include metadata.texi
+@include ffprobe-format.texi
