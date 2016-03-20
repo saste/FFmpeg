@@ -254,6 +254,46 @@ This demuxer is used to demux FLV files and RTMP network streams.
 Allocate the streams according to the onMetaData array content.
 @end table
 
+@anchor{fftextdata}
+@section fftextdata, fftd
+
+FFmpeg text data demuxer.
+
+This special demuxer allows to read serialized data base64-encoded and
+remux it. It is especially useful for injecting opaque data streams.
+
+The fftextdata bytestream consists of a sequence of packets. Each
+packet starts with a timestamps expressed in a format recognized by
+FFmpeg (see
+@ref{time duration syntax,,the Time duration section in the ffmpeg-utils(1) manual,ffmpeg-utils})
+followed by a sequence of spaces and the base64 encoded data for the
+packet, terminated by ";". The data representation may contain
+interleaved space characters (a space, a tab, or a newline) which are
+ignored.
+
+At the moment a single stream can be represented by an fftextdata
+bytestream.
+
+If an input filename is "fftextdata" or "fftd" then the file format is
+recognized as fftextdata.
+
+@subsection Options
+@table @option
+@item codec_name
+Set the codec name for the packets data.
+@end table
+
+@subsection Examples
+
+@itemize
+@item
+Inject timed_id3 packed data stored into the data.fftd file into the
+output file.
+@example
+ffmpeg -i input.mp4 -codec_name timed_id3 -f fftextdata -i data.fftd -y -map 0 -map 1 -c copy output.ts
+@end example
+@end itemize
+
 @section libgme
 
 The Game Music Emu library is a collection of video game music file emulators.

@@ -129,6 +129,37 @@ and the input video converted to MPEG-2 video, use the command:
 ffmpeg -i INPUT -c:a pcm_u8 -c:v mpeg2video -f crc -
 @end example
 
+@section fftextdata, fftd
+
+FFmpeg text data muxer.
+
+The fftextdata bytestream consists of a sequence of packets. Each
+packet starts with a timestamps expressed in a format recognized by
+FFmpeg (see
+@ref{time duration syntax,,the Time duration section in the ffmpeg-utils(1) manual,ffmpeg-utils})
+followed by a sequence of spaces and the base64 encoded data for the
+packet, terminated by ";". The data representation may contain
+interleaved space characters (a space, a tab, or a newline) which are
+ignored.
+
+At the moment only a single stream can be represented by an fftextdata
+bytestream.
+
+This muxer can be used to reinject the stream (e.g. a data stream) in
+a different output, or to provide serialized data of the encoded data.
+
+The output can then be read using the fftextdata demuxer.
+
+@subsection Examples
+
+@itemize
+@item
+Store a data stream to an output file:
+@example
+ffmpeg -i INPUT -codec copy -map 0 -an -vn data.fftd
+@end example
+@end itemize
+
 @anchor{framecrc}
 @section framecrc
 
