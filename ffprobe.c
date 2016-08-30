@@ -100,6 +100,7 @@ static int use_byte_value_binary_prefix = 0;
 static int use_value_sexagesimal_format = 0;
 static int show_private_data            = 1;
 static int show_compact_data            = 0;
+static int show_headers_first           = 0;
 
 static char *print_format;
 static char *stream_specifier;
@@ -2712,6 +2713,26 @@ static int probe_file(WriterContext *wctx, const char *filename)
         }
     }
 
+    if (show_headers_first && do_show_format) {
+        ret = show_format(wctx, &ifile);
+        CHECK_END;
+    }
+
+    if (show_headers_first && do_show_chapters) {
+        ret = show_chapters(wctx, &ifile);
+        CHECK_END;
+    }
+
+    if (show_headers_first && do_show_streams) {
+        ret = show_streams(wctx, &ifile);
+        CHECK_END;
+    }
+
+    if (show_headers_first && do_show_programs) {
+        ret = show_programs(wctx, &ifile);
+        CHECK_END;
+    }
+
     if (do_read_frames || do_read_packets) {
         if (do_show_frames && do_show_packets &&
             wctx->writer->flags & WRITER_FLAG_PUT_PACKETS_AND_FRAMES_IN_SAME_CHAPTER)
@@ -2728,20 +2749,20 @@ static int probe_file(WriterContext *wctx, const char *filename)
         CHECK_END;
     }
 
-    if (do_show_programs) {
+    if (!show_headers_first && do_show_programs) {
         ret = show_programs(wctx, &ifile);
         CHECK_END;
     }
 
-    if (do_show_streams) {
+    if (!show_headers_first && do_show_streams) {
         ret = show_streams(wctx, &ifile);
         CHECK_END;
     }
-    if (do_show_chapters) {
+    if (!show_headers_first && do_show_chapters) {
         ret = show_chapters(wctx, &ifile);
         CHECK_END;
     }
-    if (do_show_format) {
+    if (!show_headers_first && do_show_format) {
         ret = show_format(wctx, &ifile);
         CHECK_END;
     }
@@ -3243,6 +3264,7 @@ static const OptionDef real_options[] = {
     { "default", HAS_ARG | OPT_AUDIO | OPT_VIDEO | OPT_EXPERT, {.func_arg = opt_default}, "generic catch all option", "" },
     { "i", HAS_ARG, {.func_arg = opt_input_file_i}, "read specified file", "input_file"},
     { "show_compact_data", OPT_BOOL, {&show_compact_data}, "show packet data in a compact format" },
+    { "show_headers_first", OPT_BOOL, {&show_headers_first}, "show headers before the packets/frames" },
     { NULL, },
 };
 
