@@ -99,6 +99,7 @@ static int use_value_prefix             = 0;
 static int use_byte_value_binary_prefix = 0;
 static int use_value_sexagesimal_format = 0;
 static int show_private_data            = 1;
+static int show_compact_data            = 0;
 
 static char *print_format;
 static char *stream_specifier;
@@ -723,16 +724,19 @@ static void writer_print_data(WriterContext *wctx, const char *name,
     av_bprint_init(&bp, 0, AV_BPRINT_SIZE_UNLIMITED);
     av_bprintf(&bp, "\n");
     while (size) {
+        if (!show_compact_data)
         av_bprintf(&bp, "%08x: ", offset);
-        l = FFMIN(size, 16);
+        l = FFMIN(size, show_compact_data ? 40 : 16);
         for (i = 0; i < l; i++) {
             av_bprintf(&bp, "%02x", data[i]);
-            if (i & 1)
+            if (!show_compact_data && (i & 1))
                 av_bprintf(&bp, " ");
         }
+        if (!show_compact_data) {
         av_bprint_chars(&bp, ' ', 41 - 2 * i - i / 2);
         for (i = 0; i < l; i++)
             av_bprint_chars(&bp, data[i] - 32U < 95 ? data[i] : '.', 1);
+        }
         av_bprintf(&bp, "\n");
         offset += l;
         data   += l;
@@ -3238,6 +3242,7 @@ static const OptionDef real_options[] = {
     { "read_intervals", HAS_ARG, {.func_arg = opt_read_intervals}, "set read intervals", "read_intervals" },
     { "default", HAS_ARG | OPT_AUDIO | OPT_VIDEO | OPT_EXPERT, {.func_arg = opt_default}, "generic catch all option", "" },
     { "i", HAS_ARG, {.func_arg = opt_input_file_i}, "read specified file", "input_file"},
+    { "show_compact_data", OPT_BOOL, {&show_compact_data}, "show packet data in a compact format" },
     { NULL, },
 };
 
