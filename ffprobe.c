@@ -101,6 +101,8 @@ static int show_private_data            = 1;
 static int show_compact_data            = 0;
 static int show_headers_first           = 0;
 
+static int need_input = 0;
+
 static char *print_format;
 static char *stream_specifier;
 static char *show_data_hash;
@@ -128,6 +130,8 @@ struct section {
 #define SECTION_FLAG_IS_ARRAY        2 ///< the section contains an array of elements of the same type
 #define SECTION_FLAG_HAS_VARIABLE_FIELDS 4 ///< the section may contain a variable number of fields with variable keys.
                                            ///  For these sections the element_name field is mandatory.
+#define SECTION_FLAG_NEED_INPUT          8 ///< the section implies the reading of an input source
+
     int flags;
     int parent_id;                               ///< unique ID of the parent section
     int children_ids[SECTION_MAX_NB_CHILDREN+1]; ///< list of children section IDS, terminated by -1
@@ -182,21 +186,21 @@ typedef enum {
 } SectionID;
 
 static struct section sections[] = {
-    [SECTION_ID_CHAPTERS] =           { SECTION_ID_CHAPTERS, "chapters", SECTION_FLAG_IS_ARRAY, SECTION_ID_ROOT, { SECTION_ID_CHAPTER, -1 } },
+    [SECTION_ID_CHAPTERS] =           { SECTION_ID_CHAPTERS, "chapters", SECTION_FLAG_IS_ARRAY|SECTION_FLAG_NEED_INPUT, SECTION_ID_ROOT, { SECTION_ID_CHAPTER, -1 } },
     [SECTION_ID_CHAPTER] =            { SECTION_ID_CHAPTER, "chapter", 0, SECTION_ID_CHAPTERS, { SECTION_ID_CHAPTER_TAGS, -1 } },
     [SECTION_ID_CHAPTER_TAGS] =       { SECTION_ID_CHAPTER_TAGS, "tags", SECTION_FLAG_HAS_VARIABLE_FIELDS, SECTION_ID_CHAPTER, { -1 }, .element_name = "tag", .unique_name = "chapter_tags" },
-    [SECTION_ID_ERROR] =              { SECTION_ID_ERROR, "error", 0, SECTION_ID_ROOT, { -1 } },
-    [SECTION_ID_FORMAT] =             { SECTION_ID_FORMAT, "format", 0, SECTION_ID_ROOT, { SECTION_ID_FORMAT_TAGS, -1 } },
+    [SECTION_ID_ERROR] =              { SECTION_ID_ERROR, "error", SECTION_FLAG_NEED_INPUT, SECTION_ID_ROOT, { -1 } },
+    [SECTION_ID_FORMAT] =             { SECTION_ID_FORMAT, "format", SECTION_FLAG_NEED_INPUT, SECTION_ID_ROOT, { SECTION_ID_FORMAT_TAGS, -1 } },
     [SECTION_ID_FORMAT_TAGS] =        { SECTION_ID_FORMAT_TAGS, "tags", SECTION_FLAG_HAS_VARIABLE_FIELDS, SECTION_ID_FORMAT, { -1 }, .element_name = "tag", .unique_name = "format_tags" },
-    [SECTION_ID_FRAMES] =             { SECTION_ID_FRAMES, "frames", SECTION_FLAG_IS_ARRAY, SECTION_ID_ROOT, { SECTION_ID_FRAME, SECTION_ID_SUBTITLE, -1 } },
+    [SECTION_ID_FRAMES] =             { SECTION_ID_FRAMES, "frames", SECTION_FLAG_IS_ARRAY|SECTION_FLAG_NEED_INPUT, SECTION_ID_ROOT, { SECTION_ID_FRAME, SECTION_ID_SUBTITLE, -1 } },
     [SECTION_ID_FRAME] =              { SECTION_ID_FRAME, "frame", 0, SECTION_ID_FRAMES, { SECTION_ID_FRAME_TAGS, SECTION_ID_FRAME_SIDE_DATA_LIST, -1 } },
     [SECTION_ID_FRAME_TAGS] =         { SECTION_ID_FRAME_TAGS, "tags", SECTION_FLAG_HAS_VARIABLE_FIELDS, SECTION_ID_FRAME, { -1 }, .element_name = "tag", .unique_name = "frame_tags" },
     [SECTION_ID_FRAME_SIDE_DATA_LIST] = { SECTION_ID_FRAME_SIDE_DATA_LIST, "side_data_list", SECTION_FLAG_IS_ARRAY, SECTION_ID_FRAME, { SECTION_ID_FRAME_SIDE_DATA, -1 } },
     [SECTION_ID_FRAME_SIDE_DATA] =    { SECTION_ID_FRAME_SIDE_DATA, "side_data", 0, SECTION_ID_FRAME_SIDE_DATA_LIST, { -1 } },
     [SECTION_ID_LIBRARY_VERSIONS] =   { SECTION_ID_LIBRARY_VERSIONS, "library_versions", SECTION_FLAG_IS_ARRAY, SECTION_ID_ROOT, { SECTION_ID_LIBRARY_VERSION, -1 } },
     [SECTION_ID_LIBRARY_VERSION] =    { SECTION_ID_LIBRARY_VERSION, "library_version", 0, SECTION_ID_LIBRARY_VERSIONS, { -1 } },
-    [SECTION_ID_PACKETS] =            { SECTION_ID_PACKETS, "packets", SECTION_FLAG_IS_ARRAY, SECTION_ID_ROOT, { SECTION_ID_PACKET, -1 } },
-    [SECTION_ID_PACKETS_AND_FRAMES] = { SECTION_ID_PACKETS_AND_FRAMES, "packets_and_frames", SECTION_FLAG_IS_ARRAY, SECTION_ID_ROOT, { SECTION_ID_PACKET, -1} },
+    [SECTION_ID_PACKETS] =            { SECTION_ID_PACKETS, "packets", SECTION_FLAG_IS_ARRAY|SECTION_FLAG_NEED_INPUT, SECTION_ID_ROOT, { SECTION_ID_PACKET, -1 } },
+    [SECTION_ID_PACKETS_AND_FRAMES] = { SECTION_ID_PACKETS_AND_FRAMES, "packets_and_frames", SECTION_FLAG_IS_ARRAY|SECTION_FLAG_NEED_INPUT, SECTION_ID_ROOT, { SECTION_ID_PACKET, -1} },
     [SECTION_ID_PACKET] =             { SECTION_ID_PACKET, "packet", 0, SECTION_ID_PACKETS, { SECTION_ID_PACKET_TAGS, SECTION_ID_PACKET_SIDE_DATA_LIST, -1 } },
     [SECTION_ID_PACKET_TAGS] =        { SECTION_ID_PACKET_TAGS, "tags", SECTION_FLAG_HAS_VARIABLE_FIELDS, SECTION_ID_PACKET, { -1 }, .element_name = "tag", .unique_name = "packet_tags" },
     [SECTION_ID_PACKET_SIDE_DATA_LIST] = { SECTION_ID_PACKET_SIDE_DATA_LIST, "side_data_list", SECTION_FLAG_IS_ARRAY, SECTION_ID_PACKET, { SECTION_ID_PACKET_SIDE_DATA, -1 } },
@@ -213,12 +217,12 @@ static struct section sections[] = {
     [SECTION_ID_PROGRAM_STREAM] =             { SECTION_ID_PROGRAM_STREAM, "stream", 0, SECTION_ID_PROGRAM_STREAM, { SECTION_ID_PROGRAM_STREAM_DISPOSITION, SECTION_ID_PROGRAM_STREAM_TAGS, -1 }, .unique_name = "program_stream" },
     [SECTION_ID_PROGRAM_TAGS] =               { SECTION_ID_PROGRAM_TAGS, "tags", SECTION_FLAG_HAS_VARIABLE_FIELDS, SECTION_ID_PROGRAM, { -1 }, .element_name = "tag", .unique_name = "program_tags" },
     [SECTION_ID_PROGRAM_VERSION] =    { SECTION_ID_PROGRAM_VERSION, "program_version", 0, SECTION_ID_ROOT, { -1 } },
-    [SECTION_ID_PROGRAMS] =           { SECTION_ID_PROGRAMS, "programs", SECTION_FLAG_IS_ARRAY, SECTION_ID_ROOT, { SECTION_ID_PROGRAM, -1 } },
+    [SECTION_ID_PROGRAMS] =           { SECTION_ID_PROGRAMS, "programs", SECTION_FLAG_IS_ARRAY|SECTION_FLAG_NEED_INPUT, SECTION_ID_ROOT, { SECTION_ID_PROGRAM, -1 } },
     [SECTION_ID_ROOT] =               { SECTION_ID_ROOT, "root", SECTION_FLAG_IS_WRAPPER, -1,
                                         { SECTION_ID_CHAPTERS, SECTION_ID_FORMAT, SECTION_ID_FRAMES, SECTION_ID_PROGRAMS, SECTION_ID_STREAMS,
                                           SECTION_ID_PACKETS, SECTION_ID_ERROR, SECTION_ID_PROGRAM_VERSION, SECTION_ID_LIBRARY_VERSIONS,
                                           SECTION_ID_PIXEL_FORMATS, -1 } },
-    [SECTION_ID_STREAMS] =            { SECTION_ID_STREAMS, "streams", SECTION_FLAG_IS_ARRAY, SECTION_ID_ROOT, { SECTION_ID_STREAM, -1 } },
+    [SECTION_ID_STREAMS] =            { SECTION_ID_STREAMS, "streams", SECTION_FLAG_IS_ARRAY|SECTION_FLAG_NEED_INPUT, SECTION_ID_ROOT, { SECTION_ID_STREAM, -1 } },
     [SECTION_ID_STREAM] =             { SECTION_ID_STREAM, "stream", 0, SECTION_ID_ROOT, { SECTION_ID_STREAM_DISPOSITION, SECTION_ID_STREAM_TAGS, SECTION_ID_STREAM_SIDE_DATA_LIST, -1 } },
     [SECTION_ID_STREAM_DISPOSITION] = { SECTION_ID_STREAM_DISPOSITION, "disposition", 0, SECTION_ID_STREAM, { -1 }, .unique_name = "stream_disposition" },
     [SECTION_ID_STREAM_TAGS] =        { SECTION_ID_STREAM_TAGS, "tags", SECTION_FLAG_HAS_VARIABLE_FIELDS, SECTION_ID_STREAM, { -1 }, .element_name = "tag", .unique_name = "stream_tags" },
@@ -226,6 +230,17 @@ static struct section sections[] = {
     [SECTION_ID_STREAM_SIDE_DATA] =   { SECTION_ID_STREAM_SIDE_DATA, "side_data", 0, SECTION_ID_STREAM_SIDE_DATA_LIST, { -1 } },
     [SECTION_ID_SUBTITLE] =           { SECTION_ID_SUBTITLE, "subtitle", 0, SECTION_ID_FRAMES, { -1 } },
 };
+
+static int section_need_input(int section_id)
+{
+    struct section *section = &sections[section_id];
+
+    if (section->flags && SECTION_FLAG_NEED_INPUT)
+        return 1;
+    if (section->parent_id == -1)
+        return 0;
+    return section_need_input(section->parent_id);
+}
 
 static const OptionDef *options;
 
@@ -2881,6 +2896,10 @@ static inline void mark_section_show_entries(SectionID section_id,
     } else {
         av_dict_copy(&section->entries_to_show, entries, 0);
     }
+
+    /* mark if we need an input */
+    if (!need_input)
+        need_input = section_need_input(section_id);
 }
 
 static int match_section(const char *section_name,
@@ -3366,9 +3385,7 @@ int main(int argc, char **argv)
         if (do_show_pixel_formats)
             ffprobe_show_pixel_formats(wctx);
 
-        if (!input_filename &&
-            ((do_show_format || do_show_programs || do_show_streams || do_show_chapters || do_show_packets || do_show_error) ||
-             (!do_show_program_version && !do_show_library_versions && !do_show_pixel_formats))) {
+        if (!input_filename && need_input) {
             show_usage();
             av_log(NULL, AV_LOG_ERROR, "You have to specify one input file.\n");
             av_log(NULL, AV_LOG_ERROR, "Use -h to get full help or, even better, run 'man %s'.\n", program_name);
