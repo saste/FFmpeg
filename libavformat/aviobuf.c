@@ -764,18 +764,28 @@ unsigned int avio_rb32(AVIOContext *s)
 
 int ff_get_line(AVIOContext *s, char *buf, int maxlen)
 {
-    int i = 0;
+    return ff_get_line2(s, buf, maxlen, NULL);
+}
+
+int ff_get_line2(AVIOContext *s, char *buf, int maxlen, int *readlen)
+{
+    int i = 0, j = 0;
     char c;
 
     do {
         c = avio_r8(s);
-        if (c && i < maxlen-1)
-            buf[i++] = c;
+        if (c) {
+            if (i < maxlen-1)
+                buf[i++] = c;
+            j++;
+        }
     } while (c != '\n' && c != '\r' && c);
     if (c == '\r' && avio_r8(s) != '\n' && !avio_feof(s))
         avio_skip(s, -1);
 
     buf[i] = 0;
+    if (readlen)
+        *readlen = j;
     return i;
 }
 
